@@ -15,6 +15,7 @@ pub struct LoginRequest {
 #[derive(Debug, Serialize)]
 pub struct LoginResponse {
     message: String,
+    token:String,
 }
 
 #[axum_macros::debug_handler]
@@ -27,6 +28,7 @@ pub async fn login(
             // Authentication successful
             let response = LoginResponse {
                 message: "Login successful".to_string(),
+                token: user.token.clone(),
             };
             Ok(Json(response))
         } else {
@@ -39,10 +41,14 @@ pub async fn login(
     }
 }
 
+
+// handle the get request
+
 #[derive(Clone)]
 pub struct User {
     username: String,
     password: String,
+    token:String,
 }
 
 #[derive(Clone)]
@@ -58,6 +64,7 @@ impl UserDatabase {
             User {
                 username: "user1".to_string(),
                 password: "password1".to_string(),
+                token: "n2739271027012hjasvda".to_string(),
             },
         );
         users.insert(
@@ -65,6 +72,7 @@ impl UserDatabase {
             User {
                 username: "user2".to_string(),
                 password: "password2".to_string(),
+                token:"vdha28736bz2321hsad63g".to_string(),
             },
         );
         users.insert(
@@ -72,6 +80,7 @@ impl UserDatabase {
             User {
                 username: "user3".to_string(),
                 password: "password3".to_string(),
+                token:"12jassan736bas7ajas".to_string()
             },
         );
         Self { users }
