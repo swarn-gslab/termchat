@@ -10,7 +10,7 @@ use std::{
 #[allow(dead_code)]
 #[derive(Debug, Deserialize, Serialize)]
 pub struct LoginRequest {
-    username: String,
+    userid: String,
     password: String,
 }
 
@@ -25,7 +25,7 @@ pub async fn login(
     Extension(database): Extension<Arc<UserDatabase>>,
     Json(request_user): Json<LoginRequest>,
 ) -> Result<Json<LoginResponse>, StatusCode> {
-    if let Some(user) = database.get(&request_user.username) {
+    if let Some(user) = database.get(&request_user.userid) {
         if user.password == request_user.password {
             // Authentication successful
             println!("Client is authenticated");
@@ -44,11 +44,30 @@ pub async fn login(
     }
 }
 
+// here we check user online and offline status
+#[derive(Debug, Deserialize, Serialize)]
+pub struct CheckOnlineStatusByUserIdRequest {
+    userid: String,
+}
+#[derive(Debug, Deserialize, Serialize)]
+pub struct CheckOnlineStatusByUserIdResponse {
+    online: bool,
+}
+pub async fn online_status(
+    Extension(database): Extension<Arc<UserDatabase>>,
+    Json(request): Json<CheckOnlineStatusByUserIdRequest>,
+) -> Result<Json<CheckOnlineStatusByUserIdResponse>, StatusCode> {
+    // let database = database.lock().unwrap();
+    match database.is_online(&request.userid) {
+        Some(online) => Ok(Json(CheckOnlineStatusByUserIdResponse { online })),
+        None => Err(StatusCode::NOT_FOUND),
+    }
+}
 // handle the get request
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct User {
-    username: String,
+    userid: String,
     password: String,
     token: String,
     online: bool,
@@ -65,7 +84,7 @@ impl UserDatabase {
         users.insert(
             "user1".to_string(),
             User {
-                username: "user1".to_string(),
+                userid: "user1".to_string(),
                 password: "password1".to_string(),
                 token: "n2739271027012hjasvda".to_string(),
                 online: false,
@@ -74,7 +93,7 @@ impl UserDatabase {
         users.insert(
             "user2".to_string(),
             User {
-                username: "user2".to_string(),
+                userid: "user2".to_string(),
                 password: "password2".to_string(),
                 token: "vdha28736bz2321hsad63g".to_string(),
                 online: false,
@@ -83,7 +102,7 @@ impl UserDatabase {
         users.insert(
             "user3".to_string(),
             User {
-                username: "user3".to_string(),
+                userid: "user3".to_string(),
                 password: "password3".to_string(),
                 token: "12jassan736bas7ajas".to_string(),
                 online: false,
@@ -91,30 +110,44 @@ impl UserDatabase {
         );
         Self { users }
     }
-    // het by user is username
-    pub fn get(&self, username: &str) -> Option<&User> {
-        self.users
-            .get(username)
-            .or_else(|| self.users.get(&username.to_string()))
-    }
-    // here we check client is online or not
-    pub fn set_online_status(&mut self, username: &str, online: bool) -> bool {
-        println!("{}", username);
-        if let Some(user) = self.users.get_mut(username) {
-            user.online = online;
-            true
-        } else {
-            false
-        }
-    }
-    // here we get status of the client
 
-    pub fn is_online(&self, username: &str) -> Option<bool> {
-        println!("{}", username);
-        if let Some(user) = self.users.get(username) {
-            Some(user.online)
-        } else {
-            None
-        }
+   
+    pub fn get(&self, userid: &str) -> Option<&User> {
+        self.users.get(userid)
     }
+    // here we check user is online or not
+    pub fn is_online(&self, userid: &str) -> Option<bool> {
+        self.users
+            .values()
+            .find(|user| user.userid == userid)
+            .map(|user| user.online)
+    }
+
+    // het by user is username
+    // pub fn get(&self, token: &str) -> Option<&User> {
+    //     self.users
+    //         .get(token)
+    //         .or_else(|| self.users.get(&token.to_string()))
+    // }
+    // // here we check client is online or not
+    // pub fn set_online_status(&mut self, token: &str, online: bool) -> bool {
+    //     println!("{}", token);
+    //     if let Some(user) = self.users.get_mut(token) {
+    //         user.online = online;
+    //         true
+    //     } else {
+    //         false
+    //     }
+    // }
+    // // here we get status of the client
+
+    // pub fn is_online(&self, token: &str) -> Option<bool> {
+    //     println!("{}", token);
+    //     if let Some(user) = self.users.get(token) {
+    //         println!("connected to client: {}", token);
+    //         Some(user.online)
+    //     } else {
+    //         println!("client is not online");
+    //         None
+    //     }
 }
