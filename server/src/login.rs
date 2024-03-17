@@ -1,12 +1,9 @@
 use axum::extract::Json;
 use axum::http::StatusCode;
 use axum::Extension;
+use log::{error, info};
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
-
+use std::sync::Arc;
 #[allow(dead_code)]
 #[derive(Debug, Deserialize, Serialize)]
 pub struct LoginRequest {
@@ -28,7 +25,7 @@ pub async fn login(
     if let Some(user) = database.get(&request_user.userid) {
         if user.password == request_user.password {
             // Authentication successful
-            println!("Client is authenticated");
+            info!("Client is authenticated");
             let response = LoginResponse {
                 message: "Login successful".to_string(),
                 token: user.token.clone(),
@@ -58,9 +55,23 @@ pub async fn online_status(
     Json(request): Json<CheckOnlineStatusByUserIdRequest>,
 ) -> Result<Json<CheckOnlineStatusByUserIdResponse>, StatusCode> {
     // let database = database.lock().unwrap();
+    info!(
+        "Received online status request for UserId {}",
+        request.userid
+    );
     match database.is_online(&request.userid) {
-        Some(online) => Ok(Json(CheckOnlineStatusByUserIdResponse { online })),
-        None => Err(StatusCode::NOT_FOUND),
+        Some(online) => {
+            info!(
+                "user{} is {}",
+                request.userid,
+                if online { "online" } else { "offline" }
+            );
+            Ok(Json(CheckOnlineStatusByUserIdResponse { online }))
+        }
+        None => {
+            error!("user {} is not online", request.userid);
+            Err(StatusCode::NOT_FOUND)
+        }
     }
 }
 // handle the get request
@@ -111,7 +122,6 @@ impl UserDatabase {
         Self { users }
     }
 
-   
     pub fn get(&self, userid: &str) -> Option<&User> {
         self.users.get(userid)
     }
