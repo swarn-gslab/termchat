@@ -291,7 +291,7 @@ async fn get_message(msg: &Message) -> Result<bool, Error> {
     } else {
         let status = msg1.status();
         let error_text = msg1.text().await?;
-
+        println!("");
         println!("failed     {}: {}", status, error_text);
         Ok(false)
     }
