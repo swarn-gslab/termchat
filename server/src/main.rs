@@ -35,7 +35,7 @@ async fn main() {
         // .layer(Extension(user_database))
         // here we add more routers
         .route("/sender", post(handle_sender_request))
-        .route("/receiver", get(handle_receiver_request))
+        .route("/receiver/:userid", get(handle_receiver_request))
         .layer(Extension(db));
 
     // .route("/", get(health_check))

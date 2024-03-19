@@ -17,7 +17,7 @@ pub struct Message {
     content: String,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct InMemoryDatabase {
     chat: Arc<Mutex<HashMap<String, String>>>,
 }
@@ -31,13 +31,14 @@ impl InMemoryDatabase {
 
     pub fn send_message(&self, message: Message) {
         let mut chat = self.chat.lock().unwrap();
-        let sender = &message.sender;
-        let receiver = &message.receiver;
-        chat.insert(sender.clone(), receiver.clone());
+        let key = format!("{}:{}", message.sender, message.receiver);
+        // let sender = &message.sender;
+        // let receiver = &message.receiver;
+        chat.insert(key, message.content.clone());
 
         println!(
             "Message sent from {} to {}:{}",
-            sender, receiver, message.content
+            message.sender, message.receiver, message.content
         );
 
         self.send_response(message);
@@ -80,10 +81,17 @@ pub async fn send_message(Extension(db): Extension<Arc<InMemoryDatabase>>, body:
 pub async fn get_receiver_msg(
     Extension(db): Extension<Arc<InMemoryDatabase>>,
     sender: String,
+    receiver: String,
 ) -> String {
-    if let Some(receiver) = db.get_receiver(&sender) {
-        info!("Receiver found for sender {}: {}", sender, receiver);
-        serde_json::json!({"receiver": receiver}).to_string()
+    println!("{:?}", db);
+    let key = format!("{}:{}", sender, receiver);
+    println!("{:?}", key);
+
+    // if let Some(message_content) = db.get_receiver(&key) {
+    if let Some(message_content) = db.chat.lock().unwrap().get(&key) {
+        // let message_content = db.chat.lock().unwrap().get(&sender).cloned().unwrap_or_default();
+        info!("Receiver found for sender {}: {}", sender, message_content);
+        serde_json::json!({"receiver": receiver,"message":message_content}).to_string()
     } else {
         error!("Receiver not found for sender {}", sender);
         json!({"error":"Receiver notfound"}).to_string()
@@ -120,10 +128,17 @@ pub async fn handle_receiver_request(
 ) -> Result<Response<Body>, StatusCode> {
     match req.method() {
         &http::Method::GET => {
+            // here i am define dummy variable name
+            let receiver = "user1";
             let sender = req.uri().path().trim_start_matches("/receiver/");
             info!("Received GET request for receiver: {}", sender);
 
-            let response = get_receiver_msg(Extension(db.clone()), sender.to_string()).await;
+            let response = get_receiver_msg(
+                Extension(db.clone()),
+                sender.to_string(),
+                receiver.to_string(),
+            )
+            .await;
             info!("Sending response for receiver: {}", response);
 
             Ok(Response::new(Body::from(response)))
