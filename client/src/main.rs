@@ -1,29 +1,28 @@
-use log::info;
 use reqwest::Error;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::io;
 
-#[derive(Debug, Serialize)]
-pub struct User {
-    userid: String,
-    password: String,
-}
-
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Auth {
     userid: String,
     password: String,
 }
 
-#[derive(Debug, Serialize)]
-pub struct Users {
-    userid: String,
-    recieverid: String,
+#[derive(Serialize, Deserialize, Debug)]
+struct LoginResponse {
+    message: String,
+    token: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Users {
+    user_token: String,
+    receiverid: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Message {
-    sender: String,
+    user_token: String,
     receiver: String,
     content: String,
 }
@@ -37,24 +36,12 @@ fn display_menu() {
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    let user1 = User {
-        userid: "user1".to_string(),
-        password: "password1".to_string(),
-    };
-    let user2 = User {
-        userid: "user2".to_string(),
-        password: "password2".to_string(),
-    };
-    let user3 = User {
-        userid: "user3".to_string(),
-        password: "password3".to_string(),
-    };
-
-    let mut logged_in = false;
+    let mut logged_in = false; // Start with not logged in
+    let mut user_token = String::new(); // Variable to store the token
+    display_menu();
 
     loop {
         if !logged_in {
-            display_menu();
             println!("");
         }
 
@@ -94,73 +81,60 @@ async fn main() -> Result<(), Error> {
 
                 let auth = Auth {
                     userid: x.clone(),
-                    password: y,
+                    password: y.clone(),
                 };
-                info!("{:?}", auth);
-                logged_in = login_auth(&user1, &user2, &user3, &auth);
 
-                if logged_in == true {
-                    println!("");
-                    user_login(&auth).await?;
-
-                    println!("");
-                    println!("Enter Reciever Id");
-
-                    let mut z = String::new();
-                    io::stdin().read_line(&mut z).expect("Failed to read line");
-                    let z = z.trim().to_string();
-
-                    let user1 = Users {
-                        userid: x.clone(),
-                        recieverid: "user1".to_string(),
-                    };
-                    let user2 = Users {
-                        userid: x.clone(),
-                        recieverid: "user2".to_string(),
-                    };
-                    let user3 = Users {
-                        userid: x.clone(),
-                        recieverid: "user3".to_string(),
-                    };
-                    println!("");
-                    let valid_user = valid_user(&user1, &user2, &user3);
-
-                    if valid_user == true {
-                        let res = select_reciever(&user1, &user2, &user3);
-
-                        start_conversation(&res).await?;
-
-                        loop {
-                            println!("");
-                            println!("Enter your message");
-
-                            let mut mess: String = String::new();
-                            io::stdin()
-                                .read_line(&mut mess)
-                                .expect("Failed to read line");
-                            let mess = mess.trim().to_string();
-
-                            let msg = Message {
-                                sender: x.clone(),
-                                receiver: z.clone(),
-                                content: mess,
-                            };
-
-                            if !send_message(&msg).await? {
-                                println!("");
-                                display_menu();
-                                break;
-                            }
-                            let response = get_message(&msg).await?; // Assuming get_message is an async function that returns a Result
-                            println!("Received response: {:?}", response);
-                        }
-                    } else {
-                        println!("Invalid User");
+                match user_login(&auth).await {
+                    Ok(token) => {
+                        user_token = token.clone(); // Store the token
+                        logged_in = true;
                     }
-                } else {
+                    Err(e) => {
+                        println!("Error: {}", e);
+                        continue;
+                    }
+                }
+
+                println!("");
+                println!("Enter Receiver Id");
+                let mut z = String::new();
+                io::stdin().read_line(&mut z).expect("Failed to read line");
+                let z = z.trim().to_string();
+
+                let receiver_user = Users {
+                    user_token: user_token.clone(),
+                    receiverid: z.clone(),
+                };
+
+                start_conversation(&receiver_user).await?;
+
+                loop {
                     println!("");
-                    println!("Invalid user! Please try again..");
-                    println!("");
+                    println!("Enter your message");
+
+                    let mut mess: String = String::new();
+                    io::stdin()
+                        .read_line(&mut mess)
+                        .expect("Failed to read line");
+                    let mess = mess.trim().to_string();
+
+                    let msg = Message {
+                        user_token: user_token.clone(),
+                        receiver: z.clone(),
+                        content: mess,
+                    };
+
+                    match send_message(&msg).await {
+                        Ok(true) => println!("Message sent successfully"),
+                        Ok(false) => {
+                            println!("Message sending failed");
+                            break;
+                        }
+                        Err(e) => {
+                            println!("Error sending message: {}", e);
+                            break;
+                        }
+                    }
                 }
             }
             2 => {
@@ -176,21 +150,7 @@ async fn main() -> Result<(), Error> {
     Ok(())
 }
 
-fn login_auth(user1: &User, user2: &User, user3: &User, auth: &Auth) -> bool {
-    if user1.userid == auth.userid && user1.password == auth.password {
-        return true;
-    }
-    if user2.userid == auth.userid && user2.password == auth.password {
-        return true;
-    }
-    if user3.userid == auth.userid && user3.password == auth.password {
-        return true;
-    } else {
-        return false;
-    }
-}
-
-async fn user_login(auth: &Auth) -> Result<(), Error> {
+async fn user_login(auth: &Auth) -> Result<String, Error> {
     let client = reqwest::Client::new();
     let res = client
         .post("http://localhost:3010/login")
@@ -199,46 +159,20 @@ async fn user_login(auth: &Auth) -> Result<(), Error> {
         .await?;
 
     if res.status().is_success() {
-        // Assuming the server returns a JSON response
-        let response_body: serde_json::Value = res.json().await?;
-
-        println!("Login successful! Response: {:?}", response_body);
+        let response_body: LoginResponse = res.json().await?;
+        println!("Login Successfully !");
+        Ok(response_body.token)
     } else {
-        // If the server returns an error, print the status code and response body
         let status = res.status();
         let error_text = res.text().await?;
-
         println!("Login failed with status {}: {}", status, error_text);
-    }
-    Ok(())
-}
-
-fn valid_user<'a>(user1: &'a Users, user2: &'a Users, user3: &'a Users) -> bool {
-    if user1.recieverid == "user1" {
-        return true;
-    } else if user2.recieverid == "user2" {
-        return true;
-    } else if user3.recieverid == "user3" {
-        return true;
-    } else {
-        return false;
+        Ok(error_text)
     }
 }
-
-fn select_reciever<'a>(user1: &'a Users, user2: &'a Users, user3: &'a Users) -> &'a Users {
-    if user1.recieverid == "user1" {
-        return user1;
-    } else if user2.recieverid == "user2" {
-        return user2;
-    } else {
-        return user3;
-    }
-}
-
-async fn start_conversation(res: &Users) -> Result<(), Error> {
+async fn start_conversation(receiver_user: &Users) -> Result<(), Error> {
     let start = reqwest::Client::new()
         .post("http://localhost:3010/status")
-        .json(&res)
+        .json(&receiver_user)
         .send()
         .await?;
 
@@ -276,32 +210,32 @@ async fn send_message(msg: &Message) -> Result<bool, Error> {
     }
 }
 
-async fn get_message(msg: &Message) -> Result<bool, Error> {
-    let msg1 = reqwest::Client::new()
-        .get("http://localhost:3010/receiver")
-        .json(&msg)
-        .send()
-        .await?;
+// async fn get_message(msg: &Message) -> Result<bool, Error> {
+//     let msg1 = reqwest::Client::new()
+//         .get("http://localhost:3010/receiver")
+//         .json(&msg)
+//         .send()
+//         .await?;
 
-    if msg1.status().is_success() {
-        let response_body: serde_json::Value = msg1.json().await?;
+//     if msg1.status().is_success() {
+//         let response_body: serde_json::Value = msg1.json().await?;
 
-        println!("Response {:?}", response_body);
-        Ok(true)
-    } else {
-        let status = msg1.status();
-        let error_text = msg1.text().await?;
-        println!("");
-        println!("failed     {}: {}", status, error_text);
-        Ok(false)
-    }
-}
+//         println!("Response {:?}", response_body);
+//         Ok(true)
+//     } else {
+//         let status = msg1.status();
+//         let error_text = msg1.text().await?;
+//         println!("");
+//         println!("failed     {}: {}", status, error_text);
+//         Ok(false)
+//     }
+// }
 
-fn should_continue() -> bool {
-    info!("Do you want to send another message? (yes/no)");
-    let mut response = String::new();
-    io::stdin()
-        .read_line(&mut response)
-        .expect("Failed to read line");
-    response.trim().to_lowercase() == "yes"
-}
+// fn should_continue() -> bool {
+//     info!("Do you want to send another message? (yes/no)");
+//     let mut response = String::new();
+//     io::stdin()
+//         .read_line(&mut response)
+//         .expect("Failed to read line");
+//     response.trim().to_lowercase() == "yes"
+// }
