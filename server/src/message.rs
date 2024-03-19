@@ -87,9 +87,9 @@ pub async fn get_receiver_msg(
     let key = format!("{}:{}", sender, receiver);
     println!("{:?}", key);
 
-    // if let Some(message_content) = db.get_receiver(&key) {
+    
     if let Some(message_content) = db.chat.lock().unwrap().get(&key) {
-        // let message_content = db.chat.lock().unwrap().get(&sender).cloned().unwrap_or_default();
+       println!("{:?}", message_content);
         info!("Receiver found for sender {}: {}", sender, message_content);
         serde_json::json!({"receiver": receiver,"message":message_content}).to_string()
     } else {
@@ -128,7 +128,6 @@ pub async fn handle_receiver_request(
 ) -> Result<Response<Body>, StatusCode> {
     match req.method() {
         &http::Method::GET => {
-            // here i am define dummy variable name
             let receiver = "user1";
             let sender = req.uri().path().trim_start_matches("/receiver/");
             info!("Received GET request for receiver: {}", sender);
@@ -149,6 +148,60 @@ pub async fn handle_receiver_request(
         }
     }
 }
+
+// pub async fn handle_receiver_request(
+//     Extension(db): Extension<Arc<InMemoryDatabase>>,
+//     req: Request<Body>,
+// ) -> Result<Response<Body>, StatusCode> {
+//     match req.method() {
+//         &http::Method::GET => {
+//             let valid_receivers = vec!["user1", "user2", "user3"]; // Valid receivers
+//             let valid_senders = vec!["user1", "user2", "user3"]; // Valid senders
+
+//             let path = req.uri().path().to_string();
+//             let parts: Vec<&str> = path.split('/').collect();
+
+//             println!("Parts: {:?}", parts);
+
+//             if parts.len() >= 3 && parts[1] == "receiver" {
+//                 let requested_receiver = parts[2].trim(); // Trim whitespace
+
+//                 println!("Requested Receiver: {:?}", requested_receiver);
+
+//                 if valid_receivers.iter().any(|r| r.eq_ignore_ascii_case(requested_receiver)) {
+//                     let sender = "user2"; // Assuming sender is user2, change as needed
+
+//                     if valid_senders.contains(&sender) {
+//                         info!("Received GET request for receiver: {} from sender: {}", requested_receiver, sender);
+
+//                         let response = get_receiver_msg(
+//                             Extension(db.clone()),
+//                             requested_receiver.to_string(),
+//                             sender.to_string(),
+//                         )
+//                         .await;
+//                         info!("Sending response for receiver: {}", response);
+
+//                         return Ok(Response::new(Body::from(response)));
+//                     }
+//                 } else {
+//                     error!("Receiver '{}' not found", requested_receiver);
+//                     return Err(StatusCode::NOT_FOUND);
+//                 }
+//             }
+
+//             error!("Invalid request: unsupported receiver or sender");
+//             return Err(StatusCode::NOT_FOUND);
+//         }
+//         _ => {
+//             error!("Received unsupported HTTP method for receiver route");
+//             return Err(StatusCode::METHOD_NOT_ALLOWED);
+//         }
+//     }
+// }
+
+
+
 
 #[cfg(test)]
 mod tests {
