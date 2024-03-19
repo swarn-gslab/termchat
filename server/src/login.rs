@@ -132,32 +132,4 @@ impl UserDatabase {
             .find(|user| user.userid == userid)
             .map(|user| user.online)
     }
-
-    // het by user is username
-    // pub fn get(&self, token: &str) -> Option<&User> {
-    //     self.users
-    //         .get(token)
-    //         .or_else(|| self.users.get(&token.to_string()))
-    // }
-    // // here we check client is online or not
-    // pub fn set_online_status(&mut self, token: &str, online: bool) -> bool {
-    //     println!("{}", token);
-    //     if let Some(user) = self.users.get_mut(token) {
-    //         user.online = online;
-    //         true
-    //     } else {
-    //         false
-    //     }
-    // }
-    // // here we get status of the client
-
-    // pub fn is_online(&self, token: &str) -> Option<bool> {
-    //     println!("{}", token);
-    //     if let Some(user) = self.users.get(token) {
-    //         println!("connected to client: {}", token);
-    //         Some(user.online)
-    //     } else {
-    //         println!("client is not online");
-    //         None
-    //     }
 }
