@@ -4,8 +4,8 @@ use axum::http::StatusCode;
 use axum::Extension;
 use log::{error, info};
 use serde::{Deserialize, Serialize};
-use tokio::sync::Mutex;
 use std::{collections::HashMap, sync::Arc};
+use tokio::sync::Mutex;
 use uuid::Uuid;
 
 #[allow(dead_code)]
@@ -19,18 +19,18 @@ pub struct LoginRequest {
 pub struct LoginResponse {
     token: String,
 }
-// pub type SessionDatabase = Arc<HashMap<String,Session>>;
+
 pub type SessionDatabase = Arc<Mutex<HashMap<String, Session>>>;
 #[derive(Debug, Deserialize, Serialize)]
-pub struct Session{
-    token:String,
-    userid:String,
+pub struct Session {
+    token: String,
+    userid: String,
 }
 
 #[axum_macros::debug_handler]
 pub async fn login(
     Extension(database): Extension<Arc<UserDatabase>>,
-    Extension(sessions):Extension<SessionDatabase>,
+    Extension(sessions): Extension<SessionDatabase>,
     Json(request_user): Json<LoginRequest>,
 ) -> Result<Json<LoginResponse>, StatusCode> {
     if let Some(user) = database.get(&request_user.userid) {
@@ -43,12 +43,13 @@ pub async fn login(
                 userid: request_user.userid.clone(),
             };
             sessions.lock().await.insert(token.clone(), session);
-            log::info!("Session created - Token: {}, UserID: {}", token, request_user.userid);
+            log::info!(
+                "Session created - Token: {}, UserID: {}",
+                token,
+                request_user.userid
+            );
 
-            let response = LoginResponse {
-                token: user.token.clone(),
-                //TODO: create session(token-key,userid-value)
-            };
+            let response = LoginResponse { token: token };
             Ok(Json(response))
         } else {
             // Incorrect password
@@ -59,8 +60,6 @@ pub async fn login(
         Err(StatusCode::UNAUTHORIZED)
     }
 }
-
-
 
 // here we check user online and offline status
 #[derive(Debug, Deserialize, Serialize)]
@@ -101,7 +100,6 @@ pub async fn online_status(
 pub struct User {
     userid: String,
     password: String,
-    token: String,
     online: bool,
 }
 
@@ -118,7 +116,6 @@ impl UserDatabase {
             User {
                 userid: "user1".to_string(),
                 password: "password1".to_string(),
-                token: "n2739271027012hjasvda".to_string(),
                 online: false,
             },
         );
@@ -127,7 +124,6 @@ impl UserDatabase {
             User {
                 userid: "user2".to_string(),
                 password: "password2".to_string(),
-                token: "vdha28736bz2321hsad63g".to_string(),
                 online: false,
             },
         );
@@ -136,7 +132,6 @@ impl UserDatabase {
             User {
                 userid: "user3".to_string(),
                 password: "password3".to_string(),
-                token: "12jassan736bas7ajas".to_string(),
                 online: false,
             },
         );

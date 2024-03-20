@@ -36,8 +36,7 @@ impl InMemoryDatabase {
     pub fn send_message(&self, message: Message) {
         let mut chat = self.chat.lock().unwrap();
         let key = format!("{}:{}", message.sender, message.receiver);
-        // let sender = &message.sender;
-        // let receiver = &message.receiver;
+        
         chat.insert(key, message.content.clone());
 
         println!(
@@ -108,7 +107,7 @@ pub fn validate_token(req: &Request<Body>,token:&str)->bool{
         info!("Allowing login request without token validation");
         return true;
     }
-   if token=="valid_token"{
+   if token=="n2739271027012hjasvda"{
     info!("Token validation Successful");
     return true;
    }else {
