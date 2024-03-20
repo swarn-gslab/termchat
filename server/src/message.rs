@@ -180,18 +180,6 @@ pub async fn handle_receiver_request(
     }
 }
 
-<<<<<<< HEAD
-
-
-
-
-
-
-
-
-
-=======
->>>>>>> 7f8a5acdd40dca142220cd7f581a217ec8ddceca
 #[cfg(test)]
 mod tests {
     use super::*;
