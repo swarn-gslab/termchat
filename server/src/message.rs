@@ -1,14 +1,18 @@
 use axum::body::to_bytes;
 use axum::Extension;
 use axum::{body::Body, extract::Request, http};
+use axum_auth::AuthBearer;
 use hyper::{Response, StatusCode};
-use log::{error, info};
+use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
 };
+
+
+// use crate::middleware::with_token_validation;
 extern crate serde_json;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {
@@ -47,7 +51,7 @@ impl InMemoryDatabase {
         let response = Message {
             sender: message.receiver.clone(),
             receiver: message.sender.clone(),
-            content: "your messsage is received".to_string(),
+            content:message.receiver.clone()
         };
         info!(
             "Message send from {} to {}:{}",
@@ -97,12 +101,36 @@ pub async fn get_receiver_msg(
     }
 }
 
+
+pub fn validate_token(req: &Request<Body>,token:&str)->bool{
+    info!("Received request: method={}, path={}", req.method(), req.uri().path());
+    if req.method()==&http::Method::POST && req.uri().path()=="/login"  {
+        info!("Allowing login request without token validation");
+        return true;
+    }
+   if token=="valid_token"{
+    info!("Token validation Successful");
+    return true;
+   }else {
+       warn!("token validation Failed");
+       return false;
+   }
+}
+
+
 pub async fn handle_sender_request(
+    AuthBearer(token): AuthBearer,
     Extension(db): Extension<Arc<InMemoryDatabase>>,
     req: Request<Body>,
+
 ) -> Result<Response<Body>, StatusCode> {
+    if !validate_token(&req, &token){
+        return Err(StatusCode::UNAUTHORIZED);
+    }
     match req.method() {
-        &http::Method::POST => {
+        &http::Method::POST => 
+    
+            {
             let body = to_bytes(req.into_body(), usize::MAX)
                 .await
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -122,9 +150,13 @@ pub async fn handle_sender_request(
 }
 
 pub async fn handle_receiver_request(
+    AuthBearer(token): AuthBearer,
     Extension(db): Extension<Arc<InMemoryDatabase>>,
     req: Request<Body>,
 ) -> Result<Response<Body>, StatusCode> {
+    if !validate_token(&req, &token){
+        return Err(StatusCode::UNAUTHORIZED);
+    }
     match req.method() {
         &http::Method::GET => {
             let receiver = "user1";
