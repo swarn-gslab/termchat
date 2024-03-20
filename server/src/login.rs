@@ -1,9 +1,13 @@
+extern crate uuid;
 use axum::extract::Json;
 use axum::http::StatusCode;
 use axum::Extension;
 use log::{error, info};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use tokio::sync::Mutex;
+use std::{collections::HashMap, sync::Arc};
+use uuid::Uuid;
+
 #[allow(dead_code)]
 #[derive(Debug, Deserialize, Serialize)]
 pub struct LoginRequest {
@@ -13,22 +17,37 @@ pub struct LoginRequest {
 
 #[derive(Debug, Serialize)]
 pub struct LoginResponse {
-    message: String,
     token: String,
+}
+// pub type SessionDatabase = Arc<HashMap<String,Session>>;
+pub type SessionDatabase = Arc<Mutex<HashMap<String, Session>>>;
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Session{
+    token:String,
+    userid:String,
 }
 
 #[axum_macros::debug_handler]
 pub async fn login(
     Extension(database): Extension<Arc<UserDatabase>>,
+    Extension(sessions):Extension<SessionDatabase>,
     Json(request_user): Json<LoginRequest>,
 ) -> Result<Json<LoginResponse>, StatusCode> {
     if let Some(user) = database.get(&request_user.userid) {
         if user.password == request_user.password {
             // Authentication successful
             info!("Client is authenticated");
+            let token = Uuid::new_v4().to_string();
+            let session = Session {
+                token: token.clone(),
+                userid: request_user.userid.clone(),
+            };
+            sessions.lock().await.insert(token.clone(), session);
+            log::info!("Session created - Token: {}, UserID: {}", token, request_user.userid);
+
             let response = LoginResponse {
-                message: "Login successful".to_string(),
                 token: user.token.clone(),
+                //TODO: create session(token-key,userid-value)
             };
             Ok(Json(response))
         } else {
@@ -40,6 +59,8 @@ pub async fn login(
         Err(StatusCode::UNAUTHORIZED)
     }
 }
+
+
 
 // here we check user online and offline status
 #[derive(Debug, Deserialize, Serialize)]

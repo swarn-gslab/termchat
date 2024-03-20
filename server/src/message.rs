@@ -1,14 +1,18 @@
 use axum::body::to_bytes;
 use axum::Extension;
 use axum::{body::Body, extract::Request, http};
+use axum_auth::AuthBearer;
 use hyper::{Response, StatusCode};
-use log::{error, info};
+use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
 };
+
+
+// use crate::middleware::with_token_validation;
 extern crate serde_json;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {
@@ -47,7 +51,7 @@ impl InMemoryDatabase {
         let response = Message {
             sender: message.receiver.clone(),
             receiver: message.sender.clone(),
-            content: "your messsage is received".to_string(),
+            content:message.receiver.clone()
         };
         info!(
             "Message send from {} to {}:{}",
@@ -98,12 +102,36 @@ pub async fn get_receiver_msg(
     }
 }
 
+
+pub fn validate_token(req: &Request<Body>,token:&str)->bool{
+    info!("Received request: method={}, path={}", req.method(), req.uri().path());
+    if req.method()==&http::Method::POST && req.uri().path()=="/login"  {
+        info!("Allowing login request without token validation");
+        return true;
+    }
+   if token=="valid_token"{
+    info!("Token validation Successful");
+    return true;
+   }else {
+       warn!("token validation Failed");
+       return false;
+   }
+}
+
+
 pub async fn handle_sender_request(
+    AuthBearer(token): AuthBearer,
     Extension(db): Extension<Arc<InMemoryDatabase>>,
     req: Request<Body>,
+
 ) -> Result<Response<Body>, StatusCode> {
+    if !validate_token(&req, &token){
+        return Err(StatusCode::UNAUTHORIZED);
+    }
     match req.method() {
-        &http::Method::POST => {
+        &http::Method::POST => 
+    
+            {
             let body = to_bytes(req.into_body(), usize::MAX)
                 .await
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -123,9 +151,13 @@ pub async fn handle_sender_request(
 }
 
 pub async fn handle_receiver_request(
+    AuthBearer(token): AuthBearer,
     Extension(db): Extension<Arc<InMemoryDatabase>>,
     req: Request<Body>,
 ) -> Result<Response<Body>, StatusCode> {
+    if !validate_token(&req, &token){
+        return Err(StatusCode::UNAUTHORIZED);
+    }
     match req.method() {
         &http::Method::GET => {
             let receiver = "user1";
@@ -149,56 +181,11 @@ pub async fn handle_receiver_request(
     }
 }
 
-// pub async fn handle_receiver_request(
-//     Extension(db): Extension<Arc<InMemoryDatabase>>,
-//     req: Request<Body>,
-// ) -> Result<Response<Body>, StatusCode> {
-//     match req.method() {
-//         &http::Method::GET => {
-//             let valid_receivers = vec!["user1", "user2", "user3"]; // Valid receivers
-//             let valid_senders = vec!["user1", "user2", "user3"]; // Valid senders
 
-//             let path = req.uri().path().to_string();
-//             let parts: Vec<&str> = path.split('/').collect();
 
-//             println!("Parts: {:?}", parts);
 
-//             if parts.len() >= 3 && parts[1] == "receiver" {
-//                 let requested_receiver = parts[2].trim(); // Trim whitespace
 
-//                 println!("Requested Receiver: {:?}", requested_receiver);
 
-//                 if valid_receivers.iter().any(|r| r.eq_ignore_ascii_case(requested_receiver)) {
-//                     let sender = "user2"; // Assuming sender is user2, change as needed
-
-//                     if valid_senders.contains(&sender) {
-//                         info!("Received GET request for receiver: {} from sender: {}", requested_receiver, sender);
-
-//                         let response = get_receiver_msg(
-//                             Extension(db.clone()),
-//                             requested_receiver.to_string(),
-//                             sender.to_string(),
-//                         )
-//                         .await;
-//                         info!("Sending response for receiver: {}", response);
-
-//                         return Ok(Response::new(Body::from(response)));
-//                     }
-//                 } else {
-//                     error!("Receiver '{}' not found", requested_receiver);
-//                     return Err(StatusCode::NOT_FOUND);
-//                 }
-//             }
-
-//             error!("Invalid request: unsupported receiver or sender");
-//             return Err(StatusCode::NOT_FOUND);
-//         }
-//         _ => {
-//             error!("Received unsupported HTTP method for receiver route");
-//             return Err(StatusCode::METHOD_NOT_ALLOWED);
-//         }
-//     }
-// }
 
 
 
