@@ -1,13 +1,10 @@
 pub mod login;
 pub mod message;
-pub mod middleware;
 use axum::routing::get;
-use tokio::sync::Mutex;
-
 // use axum::routing::get; TODO:
 
 use crate::{
-    login::{login, online_status, Session, SessionDatabase, UserDatabase},
+    login::{login, online_status, SessionDatabase, UserDatabase},
     message::{handle_receiver_request, handle_sender_request, InMemoryDatabase},
 };
 use axum::Extension;
@@ -28,23 +25,17 @@ async fn main() {
     }
 
     let user_db = Arc::new(UserDatabase::new());
-    let session_db: SessionDatabase = Arc::new(Mutex::new(HashMap::<String, Session>::new()));
+    let session_db: SessionDatabase = Arc::new(std::sync::Mutex::new(HashMap::new()));
     // let user_database = Arc::new(Mutex::new(UserDatabase::new()));
     let db = Arc::new(InMemoryDatabase::new());
     let app = Router::new()
         .route("/login", post(login))
         .route("/status", post(online_status))
         .layer(Extension(user_db))
-        .layer(Extension(session_db))
-        // .layer(Extension(user_database))
-        // here we add more routers
         .route("/sender", post(handle_sender_request))
         .route("/receiver/:userid", get(handle_receiver_request))
-        .layer(Extension(db));
-
-    // .route("/", get(health_check))
-    // TODO:
-    // .route("/message", get(create_message)) // TODO:
+        .layer(Extension(db))
+        .layer(Extension(session_db));
 
     // Start the server
     let lis = tokio::net::TcpListener::bind("0.0.0.0:3010").await.unwrap();

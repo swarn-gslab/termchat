@@ -4,8 +4,11 @@ use axum::http::StatusCode;
 use axum::Extension;
 use log::{error, info};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, sync::Arc};
-use tokio::sync::Mutex;
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
+// use tokio::sync::Mutex;
 use uuid::Uuid;
 
 #[allow(dead_code)]
@@ -42,7 +45,7 @@ pub async fn login(
                 token: token.clone(),
                 userid: request_user.userid.clone(),
             };
-            sessions.lock().await.insert(token.clone(), session);
+            sessions.lock().unwrap().insert(token.clone(), session);
             log::info!(
                 "Session created - Token: {}, UserID: {}",
                 token,
