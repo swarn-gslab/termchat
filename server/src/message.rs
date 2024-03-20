@@ -91,9 +91,8 @@ pub async fn get_receiver_msg(
     let key = format!("{}:{}", sender, receiver);
     println!("{:?}", key);
 
-    
     if let Some(message_content) = db.chat.lock().unwrap().get(&key) {
-       println!("{:?}", message_content);
+        println!("{:?}", message_content);
         info!("Receiver found for sender {}: {}", sender, message_content);
         serde_json::json!({"receiver": receiver,"message":message_content}).to_string()
     } else {
@@ -181,6 +180,7 @@ pub async fn handle_receiver_request(
     }
 }
 
+<<<<<<< HEAD
 
 
 
@@ -190,6 +190,8 @@ pub async fn handle_receiver_request(
 
 
 
+=======
+>>>>>>> 7f8a5acdd40dca142220cd7f581a217ec8ddceca
 #[cfg(test)]
 mod tests {
     use super::*;
