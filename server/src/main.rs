@@ -1,17 +1,17 @@
 pub mod login;
 pub mod message;
+pub mod implemessage;
 use axum::routing::get;
 // use axum::routing::get; TODO:
 
 use crate::{
-    login::{login, online_status, SessionDatabase, UserDatabase},
-    message::{handle_receiver_request, handle_sender_request, InMemoryDatabase},
+    implemessage::{handle_conversation_request, receive_message, send_message, start_conversation, InMemoryDatabase}, login::{login, online_status, SessionDatabase, UserDatabase}
 };
-use axum::Extension;
-use axum::{routing::post, Router};
+// use axum::Extension;
+// use axum::{routing::post, Router};
 
 use std::{collections::HashMap, sync::Arc};
-
+use axum::{extract::Extension, routing::post, Router};
 // use crate::message::create_message;
 #[tokio::main]
 async fn main() {
@@ -32,8 +32,14 @@ async fn main() {
         .route("/login", post(login))
         .route("/status", post(online_status))
         .layer(Extension(user_db))
-        .route("/sender", post(handle_sender_request))
-        .route("/receiver/:userid", get(handle_receiver_request))
+        // .route("/sender", post(handle_sender_request))
+        // .route("/receiver/:userid", get(handle_receiver_request))
+        
+        .route("/start_conversation", post(start_conversation))
+        .route("/send_message",post(send_message))
+
+        // .route("/conversation/request", post(handle_conversation_request))
+        .route("/receive_message", get(receive_message))
         .layer(Extension(db))
         .layer(Extension(session_db));
 
