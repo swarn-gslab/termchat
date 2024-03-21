@@ -10,17 +10,18 @@ pub struct Auth {
 
 #[derive(Serialize, Deserialize, Debug)]
 struct LoginResponse {
-    message: String,
+    message: Option<String>,
     token: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Users {
-    receiverid: String,
+pub struct ReceiveUser {
+    userid: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Message {
+    sender: String,
     receiver: String,
     content: String,
 }
@@ -85,6 +86,7 @@ async fn main() -> Result<(), Error> {
                 match user_login(&auth).await {
                     Ok(Some(token)) => {
                         user_token = token.clone();
+                        println!("{}", user_token);
                         logged_in = true;
                     }
                     Ok(None) => {
@@ -104,11 +106,10 @@ async fn main() -> Result<(), Error> {
                     io::stdin().read_line(&mut z).expect("Failed to read line");
                     let z = z.trim().to_string();
 
-                    let receiver_user = Users {
-                        receiverid: z.clone(),
-                    };
+                    let receiver_user = ReceiveUser { userid: z.clone() };
                     let token = user_token.clone();
-                    start_conversation(&receiver_user, &token).await?;
+
+                    //start_conversation(&receiver_user, &token).await?;
 
                     loop {
                         println!("");
@@ -121,6 +122,7 @@ async fn main() -> Result<(), Error> {
                         let mess = mess.trim().to_string();
 
                         let msg = Message {
+                            sender: x.clone(),
                             receiver: z.clone(),
                             content: mess,
                         };
@@ -173,9 +175,9 @@ async fn user_login(auth: &Auth) -> Result<Option<String>, Error> {
         Ok(None)
     }
 }
-async fn start_conversation(receiver_user: &Users, token: &str) -> Result<(), Error> {
+async fn start_conversation(receiver_user: &ReceiveUser, token: &str) -> Result<(), Error> {
     let start = reqwest::Client::new()
-        .post("http://localhost:3010/status")
+        .post("http://localhost:3010/start_conversation")
         .header("Authorization", "Bearer ".to_owned() + &token)
         .json(&receiver_user)
         .send()
@@ -195,7 +197,7 @@ async fn start_conversation(receiver_user: &Users, token: &str) -> Result<(), Er
 
 async fn send_message(msg: &Message, user_token: &str) -> Result<bool, Error> {
     let msg1 = reqwest::Client::new()
-        .post("http://localhost:3010/sender")
+        .post("http://localhost:3010/send_message")
         .header("Authorization", "Bearer ".to_owned() + &user_token)
         .json(&msg)
         .send()
@@ -215,26 +217,26 @@ async fn send_message(msg: &Message, user_token: &str) -> Result<bool, Error> {
     }
 }
 
-// async fn get_message(msg: &Message) -> Result<bool, Error> {
-//     let msg1 = reqwest::Client::new()
-//         .get("http://localhost:3010/receiver")
-//         .json(&msg)
-//         .send()
-//         .await?;
+async fn get_message(msg: &Message) -> Result<bool, Error> {
+    let msg1 = reqwest::Client::new()
+        .get("http://localhost:3010/receive_message")
+        .json(&msg)
+        .send()
+        .await?;
 
-//     if msg1.status().is_success() {
-//         let response_body: serde_json::Value = msg1.json().await?;
+    if msg1.status().is_success() {
+        let response_body: serde_json::Value = msg1.json().await?;
 
-//         println!("Response {:?}", response_body);
-//         Ok(true)
-//     } else {
-//         let status = msg1.status();
-//         let error_text = msg1.text().await?;
-//         println!("");
-//         println!("failed     {}: {}", status, error_text);
-//         Ok(false)
-//     }
-// }
+        println!("Response {:?}", response_body);
+        Ok(true)
+    } else {
+        let status = msg1.status();
+        let error_text = msg1.text().await?;
+        println!("");
+        println!("failed     {}: {}", status, error_text);
+        Ok(false)
+    }
+}
 
 // fn should_continue() -> bool {
 //     info!("Do you want to send another message? (yes/no)");
