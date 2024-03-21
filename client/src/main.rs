@@ -109,7 +109,7 @@ async fn main() -> Result<(), Error> {
                     let receiver_user = ReceiveUser { userid: z.clone() };
                     let token = user_token.clone();
 
-                    //start_conversation(&receiver_user, &token).await?;
+                    start_conversation(&receiver_user, &token).await?;
 
                     loop {
                         println!("");
