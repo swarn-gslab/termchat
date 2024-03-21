@@ -1,5 +1,6 @@
 use crate::login::{Session, SessionDatabase};
 use axum::body::to_bytes;
+use axum::http::response;
 use axum::Extension;
 use axum::{body::Body, extract::Request, http};
 use axum_auth::AuthBearer;
@@ -137,8 +138,16 @@ pub async fn start_conversation(
     .into_owned();
 
     InMemoryDatabase::establish_connection(sender, &receiver, &db);
+    // let response=send_message(Extension(db.clone()), Extension(token.clone()), Extension(session_db.clone()), receiver);
+    let body = "Connection established successfully!";
+    let response_body = Body::from(body);
+    let response = Response::builder()
+        .status(StatusCode::OK)
 
-    Ok(Response::new(Body::empty()))
+        .body(response_body)
+        .unwrap();
+
+    Ok(response)
 }
 
 pub async fn send_message(
@@ -159,7 +168,7 @@ pub async fn send_message(
     let body = String::from_utf8_lossy(&body).into_owned();
     let receiver = body.trim(); // Extract the receiver's name from the request body
 
-    db.send_message(&sender, receiver, "Hello, receiver!");
+    db.send_message(&sender, receiver, "Hello");
 
     Ok(Response::new(Body::empty()))
 }
