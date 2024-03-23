@@ -1,8 +1,7 @@
-
 use crate::login::SessionDatabase;
 use axum::body::to_bytes;
+use axum::Extension;
 use axum::{body::Body, extract::Request, http};
-use axum:: Extension;
 use axum_auth::AuthBearer;
 use hyper::{Response, StatusCode};
 use log::{error, info, warn};
@@ -86,7 +85,6 @@ impl InMemoryDatabase {
         }
         messages
     }
-
 }
 
 pub async fn send_message(

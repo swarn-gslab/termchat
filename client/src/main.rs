@@ -18,11 +18,14 @@ struct LoginResponse {
 pub struct ReceiveUser {
     userid: String,
 }
+#[derive(Debug, Serialize, Deserialize)]
+struct ReceiverResponse {
+    message: String,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Message {
     sender: String,
-    receiver: String,
     content: String,
 }
 
@@ -130,7 +133,6 @@ async fn main() -> Result<(), Error> {
 
                         let msg = Message {
                             sender: x.clone(),
-                            receiver: z.clone(),
                             content: mess,
                         };
 
@@ -209,7 +211,10 @@ fn listof_users(loggedin_user: &str) {
         }
     }
 }
-async fn start_conversation(receiver_user: &ReceiveUser, token: &str) -> Result<(), Error> {
+async fn start_conversation(
+    receiver_user: &ReceiveUser,
+    token: &str,
+) -> Result<Option<String>, Error> {
     let start = reqwest::Client::new()
         .post("http://localhost:3010/start_conversation")
         .header("Authorization", "Bearer ".to_owned() + &token)
@@ -218,17 +223,15 @@ async fn start_conversation(receiver_user: &ReceiveUser, token: &str) -> Result<
         .await?;
 
     if start.status().is_success() {
-        let response_body: serde_json::Value = start.json().await?;
-
-        println!("Response {:?}", response_body);
+        let response_body = "Receiver user is availabe".to_string();
+        println!("");
+        println!("{:?}", response_body);
+        Ok(Some(response_body))
     } else {
-        let status = start.status();
-        let error_text = start.text().await?;
-
-        println!("failed     {}: {}", status, error_text);
+        println!("");
+        println!("Receiver id is not valid or not active !");
+        Ok(None)
     }
-
-    Ok(())
 }
 
 async fn send_message(msg: &Message, user_token: &str) -> Result<bool, Error> {
@@ -248,7 +251,7 @@ async fn send_message(msg: &Message, user_token: &str) -> Result<bool, Error> {
         let status = msg1.status();
         let error_text = msg1.text().await?;
 
-        println!("failed     {}: {}", status, error_text);
+        println!("failed {}: {}", status, error_text);
         Ok(false)
     }
 }
@@ -269,16 +272,16 @@ async fn get_message(msg: &Message) -> Result<bool, Error> {
         let status = msg1.status();
         let error_text = msg1.text().await?;
         println!("");
-        println!("failed     {}: {}", status, error_text);
+        println!("failed {}: {}", status, error_text);
         Ok(false)
     }
 }
 
 // fn should_continue() -> bool {
-//     info!("Do you want to send another message? (yes/no)");
-//     let mut response = String::new();
-//     io::stdin()
-//         .read_line(&mut response)
-//         .expect("Failed to read line");
-//     response.trim().to_lowercase() == "yes"
+// info!("Do you want to send another message? (yes/no)");
+// let mut response = String::new();
+// io::stdin()
+// .read_line(&mut response)
+// .expect("Failed to read line");
+// response.trim().to_lowercase() == "yes"
 // }

@@ -9,8 +9,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 // use tokio::sync::Mutex;
-use uuid::Uuid;
 use std::fmt;
+use uuid::Uuid;
 
 #[allow(dead_code)]
 #[derive(Debug, Deserialize, Serialize)]
@@ -25,12 +25,10 @@ pub struct LoginResponse {
 }
 
 pub type SessionDatabase = Arc<Mutex<HashMap<String, Session>>>;
-#[derive(Debug, Deserialize, Serialize)]
-#[derive(Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Session {
     pub token: String,
     pub userid: String,
-    
 }
 impl Session {
     pub fn new(token: String, userid: String) -> Self {
