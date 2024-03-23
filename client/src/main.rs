@@ -35,12 +35,13 @@ fn display_menu() {
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    let mut logged_in = false;
     let mut user_token = String::new();
-    display_menu();
 
     loop {
+        let mut logged_in = false;
         if !logged_in {
+            println!("");
+            display_menu();
             println!("");
         }
 
@@ -71,6 +72,8 @@ async fn main() -> Result<(), Error> {
                 io::stdin().read_line(&mut x).expect("Failed to read line");
                 let x = x.trim().to_string();
 
+                let loggedin_user = x.clone();
+
                 println!("");
                 println!("Enter password");
 
@@ -86,7 +89,7 @@ async fn main() -> Result<(), Error> {
                 match user_login(&auth).await {
                     Ok(Some(token)) => {
                         user_token = token.clone();
-                        println!("{}", user_token);
+
                         logged_in = true;
                     }
                     Ok(None) => {
@@ -101,7 +104,11 @@ async fn main() -> Result<(), Error> {
 
                 if logged_in == true {
                     println!("");
+                    listof_users(loggedin_user.as_str());
+
+                    println!("");
                     println!("Enter Receiver Id");
+
                     let mut z = String::new();
                     io::stdin().read_line(&mut z).expect("Failed to read line");
                     let z = z.trim().to_string();
@@ -149,7 +156,10 @@ async fn main() -> Result<(), Error> {
                 println!("");
                 break;
             }
-            _ => println!("Invalid operations, please select a valid option (1-3)."),
+            _ => {
+                println!("");
+                println!("Invalid operations, please select a valid option (1-2).")
+            }
         }
     }
 
@@ -166,13 +176,37 @@ async fn user_login(auth: &Auth) -> Result<Option<String>, Error> {
 
     if res.status().is_success() {
         let response_body: LoginResponse = res.json().await?;
+        println!("");
         println!("Login Successfully !");
         Ok(Some(response_body.token))
     } else {
         let status = res.status();
         let error_text = res.text().await?;
+        println!("");
         println!("Login failed with status {}: {}", status, error_text);
+        println!("");
         Ok(None)
+    }
+}
+fn listof_users(loggedin_user: &str) {
+    println!("Total available users ");
+    println!("");
+    match loggedin_user {
+        "user1" => {
+            println!("User2");
+            println!("User3");
+        }
+        "user2" => {
+            println!("User1");
+            println!("User3");
+        }
+        "user3" => {
+            println!("User1");
+            println!("User2");
+        }
+        _ => {
+            println!("");
+        }
     }
 }
 async fn start_conversation(receiver_user: &ReceiveUser, token: &str) -> Result<(), Error> {
@@ -185,13 +219,15 @@ async fn start_conversation(receiver_user: &ReceiveUser, token: &str) -> Result<
 
     if start.status().is_success() {
         let response_body: serde_json::Value = start.json().await?;
-        println!("User get selected {:?}", response_body);
+
+        println!("Response {:?}", response_body);
     } else {
         let status = start.status();
         let error_text = start.text().await?;
 
-        println!("Invalid user {}: {}", status, error_text);
+        println!("failed     {}: {}", status, error_text);
     }
+
     Ok(())
 }
 
