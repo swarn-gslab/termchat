@@ -10,6 +10,7 @@ use std::{
 };
 // use tokio::sync::Mutex;
 use uuid::Uuid;
+use std::fmt;
 
 #[allow(dead_code)]
 #[derive(Debug, Deserialize, Serialize)]
@@ -25,11 +26,29 @@ pub struct LoginResponse {
 
 pub type SessionDatabase = Arc<Mutex<HashMap<String, Session>>>;
 #[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone)]
 pub struct Session {
-    token: String,
-    userid: String,
+    pub token: String,
+    pub userid: String,
+    
+}
+impl Session {
+    pub fn new(token: String, userid: String) -> Self {
+        Session { token, userid }
+    }
 }
 
+pub fn get_session(session_db: &SessionDatabase, token: &str) -> Option<Session> {
+    let sessions = session_db.lock().unwrap();
+    sessions.get(token).cloned()
+}
+
+impl fmt::Display for Session {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Assuming `id` is a field you want to display
+        write!(f, "Session ID: {}", self.userid)
+    }
+}
 #[axum_macros::debug_handler]
 pub async fn login(
     Extension(database): Extension<Arc<UserDatabase>>,
