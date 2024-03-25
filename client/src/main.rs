@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::io;
 
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Auth {
     userid: String,
@@ -18,7 +17,7 @@ struct LoginResponse {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ReceiveUser {
-    receiver_id:String
+    receiver_id: String,
 }
 #[derive(Debug, Serialize, Deserialize)]
 struct ResponseReceiver {
@@ -27,6 +26,7 @@ struct ResponseReceiver {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Message {
+    receiver_id: String,
     content: String,
 }
 
@@ -118,14 +118,18 @@ async fn main() -> Result<(), Error> {
                     io::stdin().read_line(&mut z).expect("Failed to read line");
                     let z = z.trim().to_string();
 
-                    let receiver_user = ReceiveUser { receiver_id: z.clone() };
+                    let receiver_user = ReceiveUser {
+                        receiver_id: z.clone(),
+                    };
                     let token = user_token.clone();
 
-                    start_conversation(&receiver_user, &token).await?;
-
-                    loop {
-                        println!("");
-                        println!("Enter your message");
+                    if start_conversation(&receiver_user, &token)
+                        .await
+                        .unwrap_or(false)
+                    {
+                        loop {
+                            println!("");
+                            println!("Enter your message");
 
                             let mut mess: String = String::new();
                             io::stdin()
@@ -133,10 +137,10 @@ async fn main() -> Result<(), Error> {
                                 .expect("Failed to read line");
                             let mess = mess.trim().to_string();
 
-                        let msg = Message {
-                            sender: x.clone(),
-                            content: mess,
-                        };
+                            let msg = Message {
+                                content: mess,
+                                receiver_id: z.clone(),
+                            };
 
                             match send_message(&msg, &user_token).await {
                                 Ok(true) => println!("Message sent successfully"),
@@ -149,6 +153,7 @@ async fn main() -> Result<(), Error> {
                                     break;
                                 }
                             }
+                            get_message(&msg, &user_token).await?;
                         }
                     }
                 } else {
@@ -213,34 +218,10 @@ async fn user_login(auth: &Auth) -> Result<Option<String>, Error> {
         Ok(None)
     }
 }
-fn listof_users(loggedin_user: &str) {
-    println!("Total available users ");
-    println!("");
-    match loggedin_user {
-        "user1" => {
-            println!("User2");
-            println!("User3");
-        }
-        "user2" => {
-            println!("User1");
-            println!("User3");
-        }
-        "user3" => {
-            println!("User1");
-            println!("User2");
-        }
-        _ => {
-            println!("");
-        }
-    }
-}
-async fn start_conversation(
-    receiver_user: &ReceiveUser,
-    token: &str,
-) -> Result<bool, Error>{
-   
+async fn start_conversation(receiver_user: &ReceiveUser, token: &str) -> Result<bool, Error> {
     let client = reqwest::Client::new();
-    let response = client.post("http://localhost:3010/start_conversation")
+    let response = client
+        .post("http://localhost:3010/start_conversation")
         .header("Authorization", format!("Bearer {}", token))
         .json(receiver_user)
         .send()
@@ -248,7 +229,11 @@ async fn start_conversation(
 
     if response.status().is_success() {
         let response_body: Value = response.json().await?;
-        println!("Response {:?}", response_body);
+        if let Some(message) = response_body.as_str() {
+            println!("{}", message);
+        } else {
+            println!("Response is not a string");
+        }
         Ok(true)
     } else {
         let status = response.status();
@@ -256,9 +241,7 @@ async fn start_conversation(
         println!("failed {}: {}", status, error_text);
         Ok(false)
     }
-        
 }
-
 
 async fn send_message(msg: &Message, user_token: &str) -> Result<bool, Error> {
     let response = reqwest::Client::new()
@@ -293,14 +276,17 @@ async fn get_message(msg: &Message, user_token: &str) -> Result<bool, Error> {
         .await?;
 
     if response.status().is_success() {
-        let response_body: serde_json::Value = response.json().await?;
-
-        println!("Response {:?}", response_body);
-        Ok(true)
+        let response_body = response.text().await?;
+        if response_body.trim() == "Message sent successfully" {
+            println!("");
+            Ok(true)
+        } else {
+            println!("{}", response_body);
+            Ok(false)
+        }
     } else {
         let status = response.status();
         let error_text = response.text().await?;
-        println!("");
         println!("failed {}: {}", status, error_text);
         Ok(false)
     }
