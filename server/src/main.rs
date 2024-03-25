@@ -2,27 +2,22 @@ pub mod login;
 pub mod message;
 pub mod implemessage;
 use std::io::Write;
+use std::{collections::HashMap, sync::Arc};
+use axum::{extract::Extension, routing::post, Router};
+use implemessage::handle_receiver_message;
+use tokio::sync::Mutex;
 // use axum::routing::get; TODO:
 
 use crate::{
-    implemessage::{handle_send_message, handle_receiver_message,start_conversation, InMemoryDatabase}, login::{login, online_status, SessionDatabase, UserDatabase}
+    implemessage::{handle_send_message,start_conversation, InMemoryDatabase}, login::{login, online_status, SessionDatabase, UserDatabase}
 };
 // use axum::Extension;
 // use axum::{routing::post, Router};
 
-use std::{collections::HashMap, sync::Arc};
-use axum::{extract::Extension, routing::post, Router};
+
 // use crate::message::create_message;
 #[tokio::main]
 async fn main() {
-    // if let Err(err) = tracing_subscriber::fmt()
-    //     .with_target(false)
-    //     .with_timer(tracing_subscriber::fmt::time::uptime())
-    //     .with_level(true)
-    //     .try_init()
-    // {
-    //     eprintln!("Failed to initialize logger: {}", err);
-    // }
     env_logger::builder()
     .filter(Some(env!("CARGO_BIN_NAME")),log::LevelFilter::Debug)
     .format(|buf, record| {
@@ -40,7 +35,7 @@ async fn main() {
     
 
     let user_db = Arc::new(UserDatabase::new());
-    let session_db: SessionDatabase = Arc::new(std::sync::Mutex::new(HashMap::new()));
+    let session_db: SessionDatabase = Arc::new(Mutex::new(HashMap::new())); 
     // let user_database = Arc::new(Mutex::new(UserDatabase::new()));
     let db = Arc::new(InMemoryDatabase::new());
     let app = Router::new()

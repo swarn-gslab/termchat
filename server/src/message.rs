@@ -1,3 +1,4 @@
+/* 
 use crate::login::SessionDatabase;
 use axum::body::to_bytes;
 use axum::Extension;
@@ -7,9 +8,10 @@ use hyper::{Response, StatusCode};
 use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use tokio::sync::Mutex;
 use std::{
     collections::HashMap,
-    sync::{Arc, Mutex},
+    sync::Arc,
 };
 
 // use crate::middleware::with_token_validation;
@@ -33,8 +35,8 @@ impl InMemoryDatabase {
         }
     }
 
-    pub fn send_message(&self, message: Message) {
-        let mut chat = self.chat.lock().unwrap();
+    pub async fn send_message(&self, message: Message) {
+        let mut chat = self.chat.lock().await;
         let key = format!("{}:{}", message.sender, message.receiver);
 
         chat.insert(key, message.content.clone());
@@ -100,7 +102,7 @@ pub async fn get_receiver_msg(
     }
 }
 
-pub fn validate_token(req: &Request<Body>, token: &str, session_db: &SessionDatabase) -> bool {
+pub  fn validate_token(req: &Request<Body>, token: &str, session_db: &SessionDatabase) -> bool {
     info!(
         "Received request: method={}, path={}",
         req.method(),
@@ -230,3 +232,4 @@ mod tests {
         assert_eq!(result, None);
     }
 }
+*/

@@ -4,13 +4,14 @@ use axum::http::StatusCode;
 use axum::Extension;
 use log::{error, info};
 use serde::{Deserialize, Serialize};
+use tokio::sync::Mutex;
 use std::{
     collections::HashMap,
-    sync::{Arc, Mutex},
+    sync::Arc,
 };
 // use tokio::sync::Mutex;
-use uuid::Uuid;
 use std::fmt;
+use uuid::Uuid;
 
 #[allow(dead_code)]
 #[derive(Debug, Deserialize, Serialize)]
@@ -25,12 +26,10 @@ pub struct LoginResponse {
 }
 
 pub type SessionDatabase = Arc<Mutex<HashMap<String, Session>>>;
-#[derive(Debug, Deserialize, Serialize)]
-#[derive(Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Session {
     pub token: String,
     pub userid: String,
-    
 }
 impl Session {
     pub fn new(token: String, userid: String) -> Self {
@@ -38,8 +37,8 @@ impl Session {
     }
 }
 
-pub fn get_session(session_db: &SessionDatabase, token: &str) -> Option<Session> {
-    let sessions = session_db.lock().unwrap();
+pub async fn get_session(session_db: &SessionDatabase, token: &str) -> Option<Session> {
+    let sessions = session_db.lock().await;
     sessions.get(token).cloned()
 }
 
@@ -64,7 +63,7 @@ pub async fn login(
                 token: token.clone(),
                 userid: request_user.userid.clone(),
             };
-            sessions.lock().unwrap().insert(token.clone(), session);
+            sessions.lock().await.insert(token.clone(), session);
             log::info!(
                 "Session created - Token: {}, UserID: {}",
                 token,
