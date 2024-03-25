@@ -1,6 +1,6 @@
+pub mod implemessage;
 pub mod login;
 pub mod message;
-pub mod implemessage;
 use std::io::Write;
 use std::{collections::HashMap, sync::Arc};
 use axum::{extract::Extension, routing::post, Router};
@@ -19,20 +19,18 @@ use crate::{
 #[tokio::main]
 async fn main() {
     env_logger::builder()
-    .filter(Some(env!("CARGO_BIN_NAME")),log::LevelFilter::Debug)
-    .format(|buf, record| {
-      let file = record.file().unwrap_or("unknown");
-      let line = record.line().unwrap_or(0);
-      let level = record.level();
-      let args = record.args();
-      match file.starts_with("") {
-        true => writeln!(buf, "{file}:{line} {level} : {args}"),
-        false => Ok(()),
-      }
-    })
-    .init();
-
-    
+        .filter(Some(env!("CARGO_BIN_NAME")), log::LevelFilter::Debug)
+        .format(|buf, record| {
+            let file = record.file().unwrap_or("unknown");
+            let line = record.line().unwrap_or(0);
+            let level = record.level();
+            let args = record.args();
+            match file.starts_with("") {
+                true => writeln!(buf, "{file}:{line} {level} : {args}"),
+                false => Ok(()),
+            }
+        })
+        .init();
 
     let user_db = Arc::new(UserDatabase::new());
     let session_db: SessionDatabase = Arc::new(Mutex::new(HashMap::new())); 
@@ -44,11 +42,9 @@ async fn main() {
         .layer(Extension(user_db))
         // .route("/sender", post(handle_sender_request))
         // .route("/receiver/:userid", get(handle_receiver_request))
-        
         .route("/start_conversation", post(start_conversation))
-        .route("/send_message",post(handle_send_message))
+        .route("/send_message", post(handle_send_message))
         .route("/receive_message", post(handle_receiver_message))
-        
         .layer(Extension(db))
         .layer(Extension(session_db));
 
