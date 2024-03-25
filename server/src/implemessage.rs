@@ -181,7 +181,7 @@ pub async fn start_conversation(
                 connections.insert(key, receiver_userid.to_string());
                 connections.insert(reverse_key, sender_id.clone());
                 Ok(Json(format!(
-                    "User {} is Online and connection established.",
+                    "User: {} is Online and connection established.",
                     userid
                 )))
             }
