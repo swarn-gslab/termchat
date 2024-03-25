@@ -1,6 +1,8 @@
-use reqwest::Error;
+use reqwest::{Client, Error, Response};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::io;
+
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Auth {
@@ -16,10 +18,10 @@ struct LoginResponse {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ReceiveUser {
-    userid: String,
+    receiver_id:String
 }
 #[derive(Debug, Serialize, Deserialize)]
-struct ReceiverResponse {
+struct ResponseReceiver {
     message: String,
 }
 
@@ -116,7 +118,7 @@ async fn main() -> Result<(), Error> {
                     io::stdin().read_line(&mut z).expect("Failed to read line");
                     let z = z.trim().to_string();
 
-                    let receiver_user = ReceiveUser { userid: z.clone() };
+                    let receiver_user = ReceiveUser { receiver_id: z.clone() };
                     let token = user_token.clone();
 
                     start_conversation(&receiver_user, &token).await?;
@@ -214,25 +216,28 @@ fn listof_users(loggedin_user: &str) {
 async fn start_conversation(
     receiver_user: &ReceiveUser,
     token: &str,
-) -> Result<Option<String>, Error> {
-    let start = reqwest::Client::new()
-        .post("http://localhost:3010/start_conversation")
-        .header("Authorization", "Bearer ".to_owned() + &token)
-        .json(&receiver_user)
+) -> Result<bool, Error>{
+   
+    let client = reqwest::Client::new();
+    let response = client.post("http://localhost:3010/start_conversation")
+        .header("Authorization", format!("Bearer {}", token))
+        .json(receiver_user)
         .send()
         .await?;
 
-    if start.status().is_success() {
-        let response_body = "Receiver user is availabe".to_string();
-        println!("");
-        println!("{:?}", response_body);
-        Ok(Some(response_body))
+    if response.status().is_success() {
+        let response_body: Value = response.json().await?;
+        println!("Response {:?}", response_body);
+        Ok(true)
     } else {
-        println!("");
-        println!("Receiver id is not valid or not active !");
-        Ok(None)
+        let status = response.status();
+        let error_text = response.text().await?;
+        println!("failed {}: {}", status, error_text);
+        Ok(false)
     }
+        
 }
+
 
 async fn send_message(msg: &Message, user_token: &str) -> Result<bool, Error> {
     let msg1 = reqwest::Client::new()
