@@ -4,11 +4,8 @@ use axum::http::StatusCode;
 use axum::Extension;
 use log::{error, info};
 use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, sync::Arc};
 use tokio::sync::Mutex;
-use std::{
-    collections::HashMap,
-    sync::Arc,
-};
 // use tokio::sync::Mutex;
 use std::fmt;
 use uuid::Uuid;

@@ -25,7 +25,6 @@ struct ReceiverResponse {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Message {
-    sender: String,
     content: String,
 }
 
@@ -39,6 +38,7 @@ fn display_menu() {
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     let mut user_token = String::new();
+    let mut active_conversation = String::new();
 
     loop {
         let mut logged_in = false;
@@ -119,7 +119,8 @@ async fn main() -> Result<(), Error> {
                     let receiver_user = ReceiveUser { userid: z.clone() };
                     let token = user_token.clone();
 
-                    start_conversation(&receiver_user, &token).await?;
+                    start_conversation(&receiver_user, &token, &active_conversation).await?;
+                    println!(":?", active_conversation);
 
                     loop {
                         println!("");
@@ -131,10 +132,7 @@ async fn main() -> Result<(), Error> {
                             .expect("Failed to read line");
                         let mess = mess.trim().to_string();
 
-                        let msg = Message {
-                            sender: x.clone(),
-                            content: mess,
-                        };
+                        let msg = Message { content: mess };
 
                         match send_message(&msg, &user_token).await {
                             Ok(true) => println!("Message sent successfully"),
@@ -211,9 +209,11 @@ fn listof_users(loggedin_user: &str) {
         }
     }
 }
+
 async fn start_conversation(
     receiver_user: &ReceiveUser,
     token: &str,
+    mut active_conversation: &String,
 ) -> Result<Option<String>, Error> {
     let start = reqwest::Client::new()
         .post("http://localhost:3010/start_conversation")
@@ -221,7 +221,7 @@ async fn start_conversation(
         .json(&receiver_user)
         .send()
         .await?;
-
+    active_conversation = &start.status().to_string();
     if start.status().is_success() {
         let response_body = "Receiver user is availabe".to_string();
         println!("");

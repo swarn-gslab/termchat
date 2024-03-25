@@ -1,19 +1,19 @@
 pub mod implemessage;
 pub mod login;
 pub mod message;
-use std::io::Write;
-use std::{collections::HashMap, sync::Arc};
 use axum::{extract::Extension, routing::post, Router};
 use implemessage::handle_receiver_message;
+use std::io::Write;
+use std::{collections::HashMap, sync::Arc};
 use tokio::sync::Mutex;
 // use axum::routing::get; TODO:
 
 use crate::{
-    implemessage::{handle_send_message,start_conversation, InMemoryDatabase}, login::{login, online_status, SessionDatabase, UserDatabase}
+    implemessage::{handle_send_message, start_conversation, InMemoryDatabase},
+    login::{login, online_status, SessionDatabase, UserDatabase},
 };
 // use axum::Extension;
 // use axum::{routing::post, Router};
-
 
 // use crate::message::create_message;
 #[tokio::main]
@@ -33,7 +33,7 @@ async fn main() {
         .init();
 
     let user_db = Arc::new(UserDatabase::new());
-    let session_db: SessionDatabase = Arc::new(Mutex::new(HashMap::new())); 
+    let session_db: SessionDatabase = Arc::new(Mutex::new(HashMap::new()));
     // let user_database = Arc::new(Mutex::new(UserDatabase::new()));
     let db = Arc::new(InMemoryDatabase::new());
     let app = Router::new()
