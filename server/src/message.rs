@@ -178,7 +178,8 @@ pub async fn start_conversation(
                 Ok(Json(format!("User is Online and connection established.",)))
             }
         }
-        None => Ok(Json("User is Offline.".to_string())),
+        // None => Ok(Json("User is Offline.".to_string())),
+        None=>Err(StatusCode::UNAUTHORIZED),
     }
 }
 

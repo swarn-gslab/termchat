@@ -130,26 +130,26 @@ impl UserDatabase {
     pub fn new() -> Self {
         let mut users = std::collections::HashMap::new();
         users.insert(
-            "user1".to_string(),
+            "Swarnjit".to_string(),
             User {
-                userid: "user1".to_string(),
-                password: "password1".to_string(),
+                userid: "Swarnjit".to_string(),
+                password: "GS1".to_string(),
                 online: false,
             },
         );
         users.insert(
-            "user2".to_string(),
+            "Sanjeev".to_string(),
             User {
-                userid: "user2".to_string(),
-                password: "password2".to_string(),
+                userid: "Sanjeev".to_string(),
+                password: "GS2".to_string(),
                 online: false,
             },
         );
         users.insert(
-            "user3".to_string(),
+            "Kamlesh".to_string(),
             User {
-                userid: "user3".to_string(),
-                password: "password3".to_string(),
+                userid: "Kamlesh".to_string(),
+                password: "GS3".to_string(),
                 online: false,
             },
         );

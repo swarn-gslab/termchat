@@ -1,4 +1,4 @@
-use reqwest::{Client, Error, Response};
+use reqwest::Error;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::io;
@@ -40,7 +40,6 @@ fn display_menu() {
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     let mut user_token = String::new();
-    let mut active_conversation = String::new();
 
     loop {
         let mut logged_in = false;
@@ -102,7 +101,7 @@ async fn main() -> Result<(), Error> {
                     }
                     Err(e) => {
                         println!("Error: {}", e);
-                        logged_in = false;
+
                         continue;
                     }
                 }
@@ -110,54 +109,59 @@ async fn main() -> Result<(), Error> {
                 if logged_in == true {
                     println!("");
                     listof_users(loggedin_user.as_str());
+                    loop {
+                        println!("");
+                        println!("Enter Receiver Id");
 
-                    println!("");
-                    println!("Enter Receiver Id");
+                        let mut z = String::new();
+                        io::stdin().read_line(&mut z).expect("Failed to read line");
+                        let z = z.trim().to_string();
 
-                    let mut z = String::new();
-                    io::stdin().read_line(&mut z).expect("Failed to read line");
-                    let z = z.trim().to_string();
+                        let receiver_user = ReceiveUser {
+                            receiver_id: z.clone(),
+                        };
+                        let token = user_token.clone();
 
-                    let receiver_user = ReceiveUser {
-                        receiver_id: z.clone(),
-                    };
-                    let token = user_token.clone();
+                        if let Ok(success) = start_conversation(&receiver_user, &token).await {
+                            if success {
+                                loop {
+                                    println!("");
+                                    println!("Enter your message");
 
-                    if start_conversation(&receiver_user, &token)
-                        .await
-                        .unwrap_or(false)
-                    {
-                        loop {
-                            println!("");
-                            println!("Enter your message");
+                                    let mut mess: String = String::new();
+                                    io::stdin()
+                                        .read_line(&mut mess)
+                                        .expect("Failed to read line");
+                                    let mess = mess.trim().to_string();
 
-                            let mut mess: String = String::new();
-                            io::stdin()
-                                .read_line(&mut mess)
-                                .expect("Failed to read line");
-                            let mess = mess.trim().to_string();
+                                    let msg = Message {
+                                        content: mess,
+                                        receiver_id: z.clone(),
+                                    };
+                                    println!("");
+                                    get_message(&msg, &user_token).await?;
 
-                            let msg = Message {
-                                content: mess,
-                                receiver_id: z.clone(),
-                            };
-
-                            match send_message(&msg, &user_token).await {
-                                Ok(true) => println!("Message sent successfully"),
-                                Ok(false) => {
-                                    println!("Message sending failed");
-                                    break;
+                                    match send_message(&msg, &user_token).await {
+                                        Ok(true) => println!("Message sent successfully"),
+                                        Ok(false) => {
+                                            println!("Message sending failed");
+                                            break;
+                                        }
+                                        Err(e) => {
+                                            println!("Error sending message: {}", e);
+                                            break;
+                                        }
+                                    }
                                 }
-                                Err(e) => {
-                                    println!("Error sending message: {}", e);
-                                    break;
-                                }
+                            } else {
+                                println!("Invalid receiver ID or Not-active User !");
+                                continue;
                             }
-                            get_message(&msg, &user_token).await?;
+                        } else {
+                            println!("Failed to start conversation due to an error");
+                            continue;
                         }
                     }
-                } else {
-                    println!("Invalid user !");
                 }
             }
             2 => {
@@ -172,24 +176,23 @@ async fn main() -> Result<(), Error> {
             }
         }
     }
-
     Ok(())
 }
 fn listof_users(loggedin_user: &str) {
     println!("Total available users ");
     println!("");
     match loggedin_user {
-        "user1" => {
-            println!("User2");
-            println!("User3");
+        "Swarnjit" => {
+            println!("Sanjeev");
+            println!("Kamlesh");
         }
-        "user2" => {
-            println!("User1");
-            println!("User3");
+        "Sanjeev" => {
+            println!("Swarnjit");
+            println!("Kamlesh");
         }
-        "user3" => {
-            println!("User1");
-            println!("User2");
+        "Kamlesh" => {
+            println!("Swarnjit");
+            println!("Sanjeev");
         }
         _ => {
             println!("");
@@ -236,9 +239,7 @@ async fn start_conversation(receiver_user: &ReceiveUser, token: &str) -> Result<
         }
         Ok(true)
     } else {
-        let status = response.status();
-        let error_text = response.text().await?;
-        println!("failed {}: {}", status, error_text);
+        println!("");
         Ok(false)
     }
 }
@@ -274,29 +275,27 @@ async fn get_message(msg: &Message, user_token: &str) -> Result<bool, Error> {
         .json(&msg)
         .send()
         .await?;
-
     if response.status().is_success() {
-        let response_body = response.text().await?;
-        if response_body.trim() == "Message sent successfully" {
-            println!("");
-            Ok(true)
+        let response_body: serde_json::Value = response.json().await?;
+
+        if let Some(messages) = response_body.get("messages").and_then(|m| m.as_array()) {
+            println!("Message Received: ",);
+            for message in messages {
+                if let Some(message_content) = message.as_str() {
+                    println!(" {}", message_content);
+                } else {
+                    println!("Invalid message content");
+                }
+            }
         } else {
-            println!("{}", response_body);
-            Ok(false)
+            println!("No messages found in Received message");
         }
+
+        Ok(true)
     } else {
         let status = response.status();
         let error_text = response.text().await?;
-        println!("failed {}: {}", status, error_text);
+        println!("Failed {}: {}", status, error_text);
         Ok(false)
     }
 }
-
-// fn should_continue() -> bool {
-// info!("Do you want to send another message? (yes/no)");
-// let mut response = String::new();
-// io::stdin()
-// .read_line(&mut response)
-// .expect("Failed to read line");
-// response.trim().to_lowercase() == "yes"
-// }
