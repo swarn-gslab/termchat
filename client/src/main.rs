@@ -144,7 +144,7 @@ async fn main() -> Result<(), Error> {
                                     match send_message(&msg, &user_token).await {
                                         Ok(true) => println!("Message sent successfully"),
                                         Ok(false) => {
-                                            println!("Message sending failed");
+                                            println!("");
                                             break;
                                         }
                                         Err(e) => {
@@ -257,7 +257,7 @@ async fn send_message(msg: &Message, user_token: &str) -> Result<bool, Error> {
             println!("");
             Ok(true)
         } else {
-            println!("Unexpected response: {}", response_body);
+            println!("{}", response_body);
             Ok(false)
         }
     } else {

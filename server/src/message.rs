@@ -179,7 +179,7 @@ pub async fn start_conversation(
             }
         }
         // None => Ok(Json("User is Offline.".to_string())),
-        None=>Err(StatusCode::UNAUTHORIZED),
+        None => Err(StatusCode::UNAUTHORIZED),
     }
 }
 

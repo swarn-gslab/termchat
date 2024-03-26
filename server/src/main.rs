@@ -1,14 +1,13 @@
-
 pub mod login;
 pub mod message;
+use crate::{
+    login::{login, online_status, SessionDatabase, UserDatabase},
+    message::{handle_receiver_message, handle_send_message, start_conversation, InMemoryDatabase},
+};
 use axum::{extract::Extension, routing::post, Router};
 use std::io::Write;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::Mutex;
-use crate::{
-    message::{handle_send_message,handle_receiver_message, start_conversation, InMemoryDatabase},
-    login::{login, online_status, SessionDatabase, UserDatabase},
-};
 
 #[tokio::main]
 async fn main() {
