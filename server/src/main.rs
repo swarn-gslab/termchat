@@ -27,14 +27,11 @@ async fn main() {
 
     let user_db = Arc::new(UserDatabase::new());
     let session_db: SessionDatabase = Arc::new(Mutex::new(HashMap::new()));
-    // let user_database = Arc::new(Mutex::new(UserDatabase::new()));
     let db = Arc::new(InMemoryDatabase::new());
     let app = Router::new()
         .route("/login", post(login))
         .route("/status", post(online_status))
         .layer(Extension(user_db))
-        // .route("/sender", post(handle_sender_request))
-        // .route("/receiver/:userid", get(handle_receiver_request))
         .route("/start_conversation", post(start_conversation))
         .route("/send_message", post(handle_send_message))
         .route("/receive_message", post(handle_receiver_message))
