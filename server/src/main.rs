@@ -1,21 +1,15 @@
-pub mod implemessage;
+
 pub mod login;
 pub mod message;
 use axum::{extract::Extension, routing::post, Router};
-use implemessage::handle_receiver_message;
 use std::io::Write;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::Mutex;
-// use axum::routing::get; TODO:
-
 use crate::{
-    implemessage::{handle_send_message, start_conversation, InMemoryDatabase},
+    message::{handle_send_message,handle_receiver_message, start_conversation, InMemoryDatabase},
     login::{login, online_status, SessionDatabase, UserDatabase},
 };
-// use axum::Extension;
-// use axum::{routing::post, Router};
 
-// use crate::message::create_message;
 #[tokio::main]
 async fn main() {
     env_logger::builder()

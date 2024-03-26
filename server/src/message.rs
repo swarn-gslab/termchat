@@ -1,108 +1,103 @@
-/*
-use crate::login::SessionDatabase;
-use axum::body::to_bytes;
-use axum::Extension;
+use crate::login::{Session, SessionDatabase};
 use axum::{body::Body, extract::Request, http};
+use axum::{Extension, Json};
 use axum_auth::AuthBearer;
 use hyper::{Response, StatusCode};
-use log::{error, info, warn};
+use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use tokio::sync::Mutex;
-use std::{
-    collections::HashMap,
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
+use tokio::sync::{Mutex, MutexGuard};
 
-// use crate::middleware::with_token_validation;
-extern crate serde_json;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {
-    sender: String,
-    receiver: String,
     content: String,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoredMessage {
+    content: String,
+    owner: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Conversation {
+    receiver_id: String,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReceiverUser {
+    userid: String,
 }
 
 #[derive(Default, Debug)]
 pub struct InMemoryDatabase {
-    chat: Arc<Mutex<HashMap<String, String>>>,
+    chat: Arc<Mutex<HashMap<String, Vec<StoredMessage>>>>, // key = conbination of sender and receiver id & value = pair of messages
+    connections: Arc<Mutex<HashMap<String, String>>>, // key = receiver userid and value = sender userid
 }
 
 impl InMemoryDatabase {
     pub fn new() -> Self {
         InMemoryDatabase {
             chat: Arc::new(Mutex::new(HashMap::new())),
+            connections: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
-    pub async fn send_message(&self, message: Message) {
-        let mut chat = self.chat.lock().await;
-        let key = format!("{}:{}", message.sender, message.receiver);
-
-        chat.insert(key, message.content.clone());
-
-        println!(
-            "Message sent from {} to {}:{}",
-            message.sender, message.receiver, message.content
-        );
-
-        self.send_response(message);
-    }
-    fn send_response(&self, message: Message) {
-        let response = Message {
-            sender: message.receiver.clone(),
-            receiver: message.sender.clone(),
-            content: message.receiver.clone(),
+    pub async fn add_message(&self, sender_id: &str, receiver_id: &str, content: String) {
+        let mut ids = vec![sender_id, receiver_id];
+        ids.sort();
+        let key = format!("{}_{}", ids[0], ids[1]);
+        info!("key: {:?}", key);
+        let message = StoredMessage {
+            content,
+            owner: sender_id.to_string(),
         };
-        info!(
-            "Message send from {} to {}:{}",
-            response.sender, response.receiver, response.content
-        );
-        let _json_response = serde_json::to_string(&response).unwrap();
-    }
-    pub fn get_receiver(&self, sender: &str) -> Option<String> {
-        let chat = self.chat.lock().unwrap();
-        chat.get(sender).map(|receiver| receiver.clone())
-    }
-}
+        info!("message: {:?}", message);
 
-pub async fn send_message(Extension(db): Extension<Arc<InMemoryDatabase>>, body: String) -> String {
-    let message: Message = match serde_json::from_str(&body) {
-        Ok(message) => message,
-        Err(err) => {
-            error!("Failed to deserialize message: {}", err);
-            return json!({"error": "Failed to deserialize message"}).to_string();
+        let mut chat = self.chat.lock().await;
+        info!("chat: {:?}", *chat);
+        chat.entry(key).or_insert_with(Vec::new).push(message);
+        info!("chat: {:?}", *chat);
+    }
+
+    pub async fn get_messages(&self, user_id: &str) -> Result<Vec<String>, StatusCode> {
+        let mut messages = Vec::new();
+        let connections = self.connections.lock().await;
+        info!("message is {:?}", messages);
+        // Construct keys for both sent and received messages
+        let sent_key_prefix = format!("{}_", user_id);
+        info!("Sent key is {:?}", sent_key_prefix);
+        let received_key_suffix = format!("_{}", user_id);
+        info!("Received key is {:?}", received_key_suffix);
+        let chat = self.chat.lock().await;
+        info!("Chat is {:?}", chat);
+        for (key, value) in chat.iter() {
+            // Check if the conversation is still active
+            let is_active = connections.contains_key(key.as_str())
+                || connections.contains_key(key.split('_').rev().collect::<String>().as_str());
+            info!("connection is active: {:?}", is_active);
+
+            if is_active {
+                for msg in value {
+                    if key.ends_with(&received_key_suffix) && msg.owner != user_id {
+                        messages.push(msg.content.clone());
+                    }
+                    // Add sent messages from the other user
+                    else if key.starts_with(&sent_key_prefix) && msg.owner != user_id {
+                        messages.push(msg.content.clone());
+                    }
+                }
+            }
         }
-    };
 
-    info!("Received message: {:?}", message);
-
-    db.send_message(message.clone());
-
-    info!("Message sent successfully");
-
-    serde_json::json!({"message": "Message sent"}).to_string()
-}
-pub async fn get_receiver_msg(
-    Extension(db): Extension<Arc<InMemoryDatabase>>,
-    sender: String,
-    receiver: String,
-) -> String {
-    println!("{:?}", db);
-    let key = format!("{}:{}", sender, receiver);
-    println!("{:?}", key);
-
-    if let Some(message_content) = db.chat.lock().unwrap().get(&key) {
-        println!("{:?}", message_content);
-        info!("Receiver found for sender {}: {}", sender, message_content);
-        serde_json::json!({"receiver": receiver,"message":message_content}).to_string()
-    } else {
-        error!("Receiver not found for sender {}", sender);
-        json!({"error":"Receiver notfound"}).to_string()
+        Ok(messages)
     }
 }
 
-pub  fn validate_token(req: &Request<Body>, token: &str, session_db: &SessionDatabase) -> bool {
+pub async fn validate_token(
+    req: &Request<Body>,
+    token: &str,
+    session_db: &SessionDatabase,
+) -> bool {
     info!(
         "Received request: method={}, path={}",
         req.method(),
@@ -112,7 +107,7 @@ pub  fn validate_token(req: &Request<Body>, token: &str, session_db: &SessionDat
         info!("Allowing login request without token validation");
         return true;
     }
-    let session_token = session_db.lock().unwrap();
+    let session_token = session_db.lock().await;
     if session_token.contains_key(token) {
         info!("Token validation Successful");
         return true;
@@ -121,115 +116,159 @@ pub  fn validate_token(req: &Request<Body>, token: &str, session_db: &SessionDat
         return false;
     }
 }
+// fn extract_receiver_id()
+// this is for the extracting the userid from the token
+async fn extract_sender_id(token: &str, session_db: &SessionDatabase) -> Option<String> {
+    let session_token = session_db.lock().await;
+    session_token
+        .get(token)
+        .map(|session| session.userid.clone())
+}
 
-pub async fn handle_sender_request(
+async fn check_user_online(
+    userid: &str,
+    sessions: &MutexGuard<'_, HashMap<String, Session>>,
+) -> Option<String> {
+    // let sessions = sessions.lock().unwrap();
+    sessions
+        .values()
+        .find(|session| session.userid == userid)
+        .map(|session| session.userid.clone())
+}
+pub async fn start_conversation(
     AuthBearer(token): AuthBearer,
     Extension(db): Extension<Arc<InMemoryDatabase>>,
     Extension(session_db): Extension<SessionDatabase>,
-    req: Request<Body>,
-) -> Result<Response<Body>, StatusCode> {
-    if !validate_token(&req, &token, &session_db) {
+    Json(request): Json<Conversation>,
+) -> Result<Json<String>, StatusCode> {
+    let mut sender_id = String::new();
+    info!("sender_id {:?}", sender_id);
+
+    let session_db = session_db.lock().await;
+    info!("session_db {:?}", session_db);
+    if let Some(session) = session_db.get(&token) {
+        let userid = &session.userid;
+        sender_id = userid.clone();
+    } else {
         return Err(StatusCode::UNAUTHORIZED);
     }
-    match req.method() {
-        &http::Method::POST => {
-            let body = to_bytes(req.into_body(), usize::MAX)
-                .await
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-            let body_str = String::from_utf8_lossy(&body).into_owned();
-            info!("Received POST request from sender: {}", body_str);
+    let receiver_userid = &request.receiver_id;
+    info!("receiver_userid{:?}", receiver_userid);
+    let is_receiver_online = check_user_online(receiver_userid, &session_db).await;
+    info!("is_receiver_online{:?}", is_receiver_online);
 
-            // Send message
-            let response = send_message(Extension(db.clone()), body_str).await;
-            Ok(Response::new(Body::from(response)))
+    match is_receiver_online {
+        Some(userid) => {
+            let mut connections = db.connections.lock().await;
+
+            let key = format!("{}_{}", sender_id, receiver_userid);
+            info!("key: {:?}", key);
+            let reverse_key = format!("{}_{}", receiver_userid, sender_id);
+            info!("reverse_key: {:?}", reverse_key);
+
+            if connections.contains_key(&key) || connections.contains_key(&reverse_key) {
+                Ok(Json(format!(
+                    "User: {} is Online and connection exists.",
+                    userid
+                )))
+            } else {
+                connections.insert(key, receiver_userid.to_string());
+                connections.insert(reverse_key, sender_id.clone());
+                Ok(Json(format!("User is Online and connection established.",)))
+            }
         }
-        _ => {
-            error!("Received unsupported HTTP method for sender route");
-            Err(StatusCode::METHOD_NOT_ALLOWED)
-        }
+        None => Ok(Json("User is Offline.".to_string())),
     }
 }
 
-pub async fn handle_receiver_request(
+pub async fn insert_connection(
+    sender_id: &str,
+    receiver_id: &str,
+    in_memory_db: &InMemoryDatabase,
+) {
+    let mut connections = in_memory_db.connections.lock().await;
+    connections.insert(receiver_id.to_string(), sender_id.to_string());
+    info!("{:?}", connections);
+    info!("Inserted connection: {} -> {}", receiver_id, sender_id);
+}
+
+pub async fn handle_send_message(
+    AuthBearer(token): AuthBearer,
+    Extension(db): Extension<Arc<InMemoryDatabase>>,
+    Extension(session_db): Extension<Arc<Mutex<HashMap<String, Session>>>>,
+    Json(request): Json<Message>,
+) -> Result<Response<Body>, StatusCode> {
+    info!("validate_token");
+    info!("Received token: {:?}", token);
+    /* */
+    let sender_id = match extract_sender_id(&token, &session_db).await {
+        Some(id) => id,
+        None => return Err(StatusCode::UNAUTHORIZED),
+    };
+    info!("Sender ID: {:?}", sender_id);
+    info!("Sender ID before fetch: {:?}", sender_id);
+    let content = request.content.to_lowercase();
+    if content == "bye" {
+        // Remove the connection between the users
+        let mut connections = db.connections.lock().await;
+        let receiver_id = connections
+            .iter()
+            .find_map(|(key, value)| {
+                if value == &sender_id {
+                    key.split('_').next().map(|id| id.to_string())
+                } else {
+                    None
+                }
+            })
+            .ok_or(StatusCode::NOT_FOUND)?;
+
+        let key = format!("{}_{}", sender_id, receiver_id);
+        let reverse_key = format!("{}_{}", receiver_id, sender_id);
+        let removed_key = connections.remove(&key);
+        let removed_reverse_key = connections.remove(&reverse_key);
+        info!("Connection removed: {} -> {}", key, removed_key.is_some());
+        info!(
+            "Connection removed: {} -> {}",
+            reverse_key,
+            removed_reverse_key.is_some()
+        );
+        return Ok(Response::new(Body::from("Connection ended.")));
+    }
+
+    // Proceed with adding the message as usual
+    let connections = db.connections.lock().await;
+    let receiver_id = connections
+        .iter()
+        .find_map(|(key, value)| {
+            if value == &sender_id {
+                key.split('_').next().map(|id| id.to_string())
+            } else {
+                None
+            }
+        })
+        .ok_or(StatusCode::NOT_FOUND)?;
+    db.add_message(&sender_id, &receiver_id, content).await;
+    Ok(Response::new(Body::from("Message sent successfully")))
+}
+
+pub async fn handle_receiver_message(
     AuthBearer(token): AuthBearer,
     Extension(db): Extension<Arc<InMemoryDatabase>>,
     Extension(session_db): Extension<SessionDatabase>,
-    req: Request<Body>,
+    Json(_request): Json<Conversation>,
 ) -> Result<Response<Body>, StatusCode> {
-    if !validate_token(&req, &token, &session_db) {
-        return Err(StatusCode::UNAUTHORIZED);
-    }
-    match req.method() {
-        &http::Method::GET => {
-            let receiver = "user1";
-            let sender = req.uri().path().trim_start_matches("/receiver/");
-            info!("Received GET request for receiver: {}", sender);
-
-            let response = get_receiver_msg(
-                Extension(db.clone()),
-                sender.to_string(),
-                receiver.to_string(),
-            )
-            .await;
-            info!("Sending response for receiver: {}", response);
-
-            Ok(Response::new(Body::from(response)))
-        }
-        _ => {
-            error!("Received unsupported HTTP method for receiver route");
-            Err(StatusCode::METHOD_NOT_ALLOWED)
-        }
-    }
+    info!("Connections{:?}", *session_db);
+    let receiver_id = match extract_sender_id(&token, &session_db).await {
+        Some(id) => id,
+        None => return Err(StatusCode::UNAUTHORIZED),
+    };
+    info!("Sender ID: {:?}", receiver_id);
+    let messages = db
+        .get_messages(&receiver_id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    info!("Messages: {:?}", messages);
+    let json_response = json!({ "messages": messages });
+    Ok(Response::new(Body::from(json_response.to_string())))
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_send_message() {
-        let db = InMemoryDatabase::new();
-        let message = Message {
-            sender: "Alice".to_string(),
-            receiver: "Bob".to_string(),
-            content: "Hello, Bob!".to_string(),
-        };
-
-        db.send_message(message.clone());
-
-        let chat = db.chat.lock().unwrap();
-        assert_eq!(chat.len(), 1);
-        assert_eq!(chat.get(&message.sender), Some(&message.receiver));
-    }
-
-    #[test]
-    fn test_get_receiver_existing() {
-        let db = InMemoryDatabase::new();
-        let sender = "Alice";
-        let receiver = "Bob";
-        let message = Message {
-            sender: sender.to_string(),
-            receiver: receiver.to_string(),
-            content: "Hello, Bob!".to_string(),
-        };
-
-        {
-            let mut chat = db.chat.lock().unwrap();
-            chat.insert(sender.to_string(), receiver.to_string());
-        }
-
-        let result = db.get_receiver(sender);
-        assert_eq!(result, Some(receiver.to_string()));
-    }
-
-    #[test]
-    fn test_get_receiver_non_existing() {
-        let db = InMemoryDatabase::new();
-        let sender = "Alice";
-
-        let result = db.get_receiver(sender);
-        assert_eq!(result, None);
-    }
-}
-*/
