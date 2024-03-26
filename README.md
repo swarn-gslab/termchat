@@ -14,3 +14,6 @@ we have local database here, certainly we have total three person
 
  if you want to talk another user then, enter userid and password
 
+ # for connection ending
+  if you are want closed/end connection that was established, then you can simply type message "Bye or bye" in enter message section.
+
